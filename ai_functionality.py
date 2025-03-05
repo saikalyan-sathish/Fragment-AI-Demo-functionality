@@ -1,80 +1,69 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
-from langchain.prompts import PromptTemplate
-from langchain.llms import HuggingFacePipeline
+import requests
 from datetime import datetime
 import streamlit as st
 from dotenv import load_dotenv
 import os
+import json
 
-# Load environment variables from .env file
 load_dotenv()
 HF_API_KEY = os.getenv("HF_API_KEY")
 
-# Load model and pipeline with caching
-@st.cache_resource
-def load_model():
-    model_name = "google/flan-t5-base"
-    tokenizer = AutoTokenizer.from_pretrained(model_name, token=HF_API_KEY)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name, token=HF_API_KEY)
-    pipe = pipeline(
-        "text2text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        max_length=100
-    )
-    return pipe
-
-# Create prompt template (moved outside function for reuse)
-template = """You are an AI assistant that can interact with the user and call functions based on their requests.
-
-Available functions:
-
-set_reminder(time, task, date): Sets a reminder with the given time, task, and date.
-
-- time: string, the time of the reminder (e.g., "3pm", "10:30 am")
-- task: string, the description of the task
-- date: string, the date in YYYY-MM-DD format
-
-If the user's request is to set a reminder, you should call this function with the appropriate parameters. If the user does not specify a date, use today's date: {today_date}
-
-Your response should be in the following format:
-
-If you are calling a function, output a JSON object with the key "function_call" containing the function name and arguments.
-
-Otherwise, output a regular response to the user.
-
-For example:
-
-{
-  "function_call": {
-    "name": "set_reminder",
-    "arguments": {
-      "time": "3pm",
-      "task": "Meeting with John",
-      "date": "2023-12-25"
-    }
-  }
-}
-
-Or, if no function is called:
-
-"Alright, I've got it."
-
-Now, the user's request is: {query}
-
-Remember, date should be in YYYY-MM-DD format.
-
-Today's date is {today_date}."""
-prompt = PromptTemplate(
-    input_variables=["query", "today_date"],
-    template=template
-)
-
-# Function to get raw output
 def get_raw_output(user_input):
-    pipe = load_model()  # Initialize pipeline here
-    hf_pipeline = HuggingFacePipeline(pipeline=pipe)
-    chain = prompt | hf_pipeline
     current_date = datetime.now().strftime("%Y-%m-%d")
-    raw_output = chain.invoke({"query": user_input, "today_date": current_date})
-    return raw_output
+    
+    # Construct the prompt
+    prompt = f"""<s>[INST] You are an AI assistant that can set reminders. Today's date: {current_date}
+
+    Available function:
+    set_reminder(time, task, date)
+
+    User request: {user_input}
+
+    Respond with either:
+    1. JSON function call (example below)
+    2. Natural language response
+
+    Example function call:
+    {{
+        "function_call": {{
+            "name": "set_reminder",
+            "arguments": {{
+                "time": "3:30 PM",
+                "task": "Meeting",
+                "date": "2023-12-25"
+            }}
+        }}
+    }} [/INST]"""
+    
+    # API call parameters
+    api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
+    headers = {
+        "Authorization": f"Bearer {HF_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 200,
+            "temperature": 0.3,
+            "return_full_text": False
+        }
+    }
+    
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        
+        # Extract generated text
+        if isinstance(result, list) and 'generated_text' in result[0]:
+            return result[0]['generated_text']
+        return result
+        
+    except requests.exceptions.HTTPError as err:
+        st.error(f"HTTP error: {err}")
+    except json.JSONDecodeError:
+        st.error("Invalid JSON response")
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+    return None
