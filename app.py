@@ -1,26 +1,21 @@
 import streamlit as st
-from ai_functionality import get_raw_output  # Import AI functionality
-from parser import ReminderOutputParser      # Import JSON output parser
+from workflow import workflow_instance
 
-# Streamlit app
-st.title("Reminder Extractor")
-st.write("Note: Please specify the date in absolute terms (e.g., 'December 25th'), or omit it for today.")
+st.title("Advanced Reminder Agent")
+user_input = st.text_input("Enter your reminder request:")
 
-# Text input for user prompt
-user_input = st.text_input("Enter your reminder request (e.g., 'set a reminder for 3pm')")
-
-# Button to process the input
-if st.button("Extract"):
+if st.button("Process"):
     if user_input:
-        with st.spinner("Extracting information..."):
-            # Get raw output from AI functionality
-            raw_output = get_raw_output(user_input)
+        with st.spinner("Processing your request..."):
+            result = workflow_instance.invoke({
+                "user_input": user_input,
+                "retries": 0
+            })
             
-            # Parse raw output to JSON using the parser
-            parser = ReminderOutputParser()
-            json_output = parser.parse(raw_output)
-            
-            # Display the JSON output
-            st.json(json_output)
+            if "result" in result:
+                st.success("✅ Reminder Created!")
+                st.json(result["parsed_data"])
+            else:
+                st.error(f"❌ Error: {result.get('error', 'Unknown error')}")
     else:
-        st.write("Please enter a reminder request.")
+        st.warning("Please enter a reminder request")
