@@ -1,7 +1,9 @@
-import requests
-from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import time
+import random
+from langchain_huggingface import HuggingFaceEndpoint
 
 # Load environment variables from .env file
 load_dotenv()
@@ -12,15 +14,30 @@ API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 if API_KEY is None:
     raise ValueError("HUGGINGFACE_API_KEY not found in .env file")
 
-def get_raw_output(user_input: str) -> str:
+# Define the LLM instance using HuggingFaceEndpoint
+llm = HuggingFaceEndpoint(
+    repo_id="mistralai/Mistral-7B-Instruct-v0.3",
+    task="text-generation",
+    max_new_tokens=4096,
+    do_sample=False,
+    return_full_text=False,  # Ensures only generated text is returned
+    huggingfacehub_api_token=API_KEY
+)
+
+def get_raw_output(user_input: str, max_retries: int = 3, initial_delay: int = 5) -> str:
     """
-    Generate a raw response using the Hugging Face Inference API for the Mistral 7B Instruct model.
+    Generate a raw response using the Hugging Face Inference API via HuggingFaceEndpoint.
     
     Args:
         user_input (str): The user's reminder request (e.g., "Remind me to call John tomorrow at 3 PM").
+        max_retries (int): Number of retry attempts if the API request fails (default: 3).
+        initial_delay (int): Initial delay in seconds for exponential backoff (default: 5).
     
     Returns:
         str: The model's response, ideally a JSON string with 'time', 'task', and 'date'.
+    
+    Raises:
+        Exception: If all retry attempts fail.
     """
     # Get the current date for context
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -35,39 +52,16 @@ For example, if the request is "Remind me to call John tomorrow at 3 PM", you sh
     "date": "{(datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")}"
 }}"""
     
-    # Set up the API endpoint and headers
-    api_url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.1"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    # Set up the payload for the API request
-    payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_length": 150,          # Allow enough tokens for JSON output
-            "num_return_sequences": 1,  # Return a single response
-            "do_sample": False          # Use greedy decoding for consistency
-        }
-    }
-    
-    # Make the API call
-    response = requests.post(api_url, json=payload, headers=headers)
-    
-    # Check if the request was successful
-    if response.status_code != 200:
-        raise Exception(f"API request failed with status code {response.status_code}: {response.text}")
-    
-    # Extract the generated text from the response
-    generated_data = response.json()
-    if not generated_data or 'generated_text' not in generated_data[0]:
-        raise Exception("Unexpected API response format")
-    
-    generated_text = generated_data[0]['generated_text']
-    
-    # Trim the prompt from the generated text if necessary
-    if generated_text.startswith(prompt):
-        generated_text = generated_text[len(prompt):].strip()
-    
-    return generated_text
+    # Retry loop with exponential backoff
+    for attempt in range(max_retries):
+        try:
+            # Use the HuggingFaceEndpoint to generate the response
+            generated_text = llm(prompt)
+            return generated_text
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed with exception: {e}")
+            if attempt < max_retries - 1:
+                delay = initial_delay * (2 ** attempt) + random.uniform(0, 1)
+                time.sleep(delay)
+            else:
+                raise Exception("All retry attempts failed. Unable to get a response from the API.")
