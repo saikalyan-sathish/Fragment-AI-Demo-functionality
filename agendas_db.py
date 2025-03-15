@@ -1,14 +1,18 @@
 from pymongo import MongoClient
 
-# Connect to the MongoDB server running on localhost at the default port 27017
-client = MongoClient('mongodb://localhost:27017/')
+# Connect to the MongoDB server (default is localhost on port 27017)
+client = MongoClient("mongodb://localhost:27017/")
 
-# Access (or create) a new database called "my_database"
-db = client['my_database']
+# Create or use an existing database named "sample_database"
+db = client["sample_database"]
 
-# Access (or create) a new collection within that database called "my_collection"
-collection = db['my_collection']
+# Create or use an existing collection named "users"
+collection = db["users"]
 
-# Insert a sample document into the collection. This action creates the database and collection if they don't exist.
-result = collection.insert_one({'name': 'Alice', 'age': 30})
-print('Document inserted with id:', result.inserted_id)
+# Document to be inserted
+document = {"name": "saikalyan"}
+
+# Insert the document into the collection
+result = collection.insert_one(document)
+
+print("Inserted document id:", result.inserted_id)
