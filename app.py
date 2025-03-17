@@ -1,12 +1,7 @@
 import streamlit as st
 from workflow import workflow_instance
 from voice_input import get_voice_input_html
-from pymongo import MongoClient
-
-# Initialize MongoDB connection once at app start
-client = MongoClient("mongodb://localhost:27017/")
-db = client["reminder_database"]
-reminders_collection = db["reminders"]
+import agenda_db  # Import your agenda_db module
 
 st.title("Advanced Reminder Agent")
 
@@ -31,11 +26,11 @@ if st.button("Process"):
             if "result" in result:
                 st.success("✅ Reminder Created!")
                 st.json(result["parsed_data"])
-                 
-                # Store in MongoDB using pre-initialized collection
+                
+                # Call agenda_db functionality
                 try:
-                    insert_result = reminders_collection.insert_one(result["parsed_data"])
-                    st.write(f"Reminder stored successfully. ID: {insert_result.inserted_id}")
+                    agenda_db.save_reminder(result["parsed_data"])
+                    st.write("Reminder stored successfully through agenda_db")
                 except Exception as e:
                     st.error(f"Error storing reminder: {e}")
             else:
