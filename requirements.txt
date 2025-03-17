@@ -13,5 +13,6 @@ langgraph
 langchain-core
 requests
 pymongo
+pydantic
 st-mongo-connection>=1.0.0
 certifi>=2023.11.17

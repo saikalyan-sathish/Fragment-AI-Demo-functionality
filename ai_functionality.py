@@ -1,8 +1,10 @@
 import os
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
+import json
+import re
 import time
 import random
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEndpoint
 from agendas_db import save_reminder  # Import MongoDB function
 
@@ -11,7 +13,6 @@ load_dotenv()
 
 # Get the API key from environment variables
 API_KEY = os.getenv('HUGGINGFACE_API_KEY')
-
 if API_KEY is None:
     raise ValueError("HUGGINGFACE_API_KEY not found in .env file")
 
@@ -19,15 +20,37 @@ if API_KEY is None:
 llm = HuggingFaceEndpoint(
     repo_id="mistralai/Mistral-7B-Instruct-v0.3",
     task="text-generation",
-    max_new_tokens=4096,
+    max_new_tokens=1024,  # Reduced from 4096 to avoid unnecessary long responses
     do_sample=False,
     return_full_text=False,  # Ensures only generated text is returned
     huggingfacehub_api_token=API_KEY
 )
 
+def extract_json(text) -> dict:
+    """
+    Extracts JSON data from the model response using regex.
+    
+    Args:
+        text: The raw response from the model (either a string or a dictionary).
+    
+    Returns:
+        dict: Extracted JSON object.
+    """
+    # If already a dictionary, return it directly.
+    if isinstance(text, dict):
+        return text
+
+    json_match = re.search(r'\{.*?\}', text, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group(0))
+        except json.JSONDecodeError:
+            raise ValueError("Extracted JSON is not valid.")
+    raise ValueError("No valid JSON found in the model response.")
+
 def get_raw_output(user_input: str, max_retries: int = 3, initial_delay: int = 5) -> dict:
     """
-    Generate a raw response using the Hugging Face Inference API and store it in MongoDB.
+    Generate a structured reminder using the Hugging Face Inference API and store it in MongoDB.
     
     Args:
         user_input (str): The user's reminder request.
@@ -42,28 +65,30 @@ def get_raw_output(user_input: str, max_retries: int = 3, initial_delay: int = 5
     """
     current_date = datetime.now().strftime("%Y-%m-%d")
     
-    prompt = f"""Today is {current_date}. Generate a JSON object with 'time', 'task', and 'date' fields for a reminder based on the following request: {user_input}
+    prompt = f"""
+Today is {current_date}. Generate a JSON object with 'time', 'task', and 'date' fields for a reminder based on the following request: "{user_input}"
 
-For example, if the request is "Remind me to call John tomorrow at 3 PM", you should output:
+For example:
+If the request is "Remind me to call John tomorrow at 3 PM", output:
 {{
     "time": "3:00 PM",
     "task": "call John",
-    "date": "{(datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")}"
-}}"""
+    "date": "{(datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')}"
+}}
+
+Ensure the output is only valid JSON.
+"""
     
     for attempt in range(max_retries):
         try:
-            generated_text = llm(prompt)
-            
-            # Ensure the response is a valid dictionary
-            reminder_data = eval(generated_text) if isinstance(generated_text, str) else generated_text
+            generated_text = llm.invoke(prompt)  # Use invoke() instead of __call__()
+            reminder_data = extract_json(generated_text)
 
-            if not isinstance(reminder_data, dict) or not all(k in reminder_data for k in ["time", "task", "date"]):
-                raise ValueError("Invalid JSON response format from LLM.")
+            if not all(k in reminder_data for k in ["time", "task", "date"]):
+                raise ValueError("Missing required fields in response JSON.")
 
             # Store in MongoDB
             success, inserted_id = save_reminder(reminder_data)
-            
             if success:
                 print(f"✅ Reminder stored in MongoDB with ID: {inserted_id}")
             else:
