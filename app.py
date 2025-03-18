@@ -35,5 +35,6 @@ if st.button("Process"):
                     st.error(f"Error storing reminder: {e}")
             else:
                 st.error(f"❌ Error: {result.get('error', 'Unknown error')}")
+                st.error(result)
     else:
         st.warning("Please enter a reminder request")

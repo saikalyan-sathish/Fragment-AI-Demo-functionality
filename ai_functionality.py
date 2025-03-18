@@ -36,7 +36,7 @@ def extract_json(text) -> dict:
     json_match = re.search(r'\{.*?\}', text, re.DOTALL)
     if json_match:
         try:
-            return json.dumps(json_match.group(0))
+            return json.loads(json_match.group(0))
         except json.JSONDecodeError:
             raise ValueError("Extracted JSON is not valid.")
     raise ValueError("No valid JSON found in the model response.")
