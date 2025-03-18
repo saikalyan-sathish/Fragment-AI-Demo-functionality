@@ -83,6 +83,7 @@ Ensure the output is only valid JSON.
         try:
             generated_text = llm.invoke(prompt)  # Use invoke() instead of __call__()
             reminder_data = extract_json(generated_text)
+            print(f"Extracted reminder data: {reminder_data}")
 
             if not all(k in reminder_data for k in ["time", "task", "date"]):
                 raise ValueError("Missing required fields in response JSON.")

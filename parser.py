@@ -3,6 +3,8 @@ import re
 
 class ReminderOutputParser:
     def parse(self, text: str) -> dict:
+        if isinstance(text, dict):  
+            return text
         try:
             return json.loads(text)
         except json.JSONDecodeError:

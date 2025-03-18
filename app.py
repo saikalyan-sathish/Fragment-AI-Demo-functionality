@@ -2,6 +2,7 @@ import streamlit as st
 from workflow import workflow_instance
 from voice_input import get_voice_input_html
 import agendas_db  # Import your agenda_db module
+import json
 
 st.title("Advanced Reminder Agent")
 
