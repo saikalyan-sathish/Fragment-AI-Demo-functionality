@@ -5,7 +5,7 @@ import time
 import random
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from langchain_huggingface import HuggingFaceEndpoint
+from huggingface_hub import InferenceClient  # Updated import
 from agendas_db import save_reminder  # Import MongoDB function
 
 # Load environment variables from .env file
@@ -16,15 +16,8 @@ API_KEY = os.getenv('HUGGINGFACE_API_KEY')
 if API_KEY is None:
     raise ValueError("HUGGINGFACE_API_KEY not found in .env file")
 
-# Define the LLM instance using HuggingFaceEndpoint
-llm = HuggingFaceEndpoint(
-    repo_id="mistralai/Mistral-7B-Instruct-v0.3",
-    task="text-generation",
-    max_new_tokens=1024,  # Reduced from 4096 to avoid unnecessary long responses
-    do_sample=False,
-    return_full_text=False,  # Ensures only generated text is returned
-    huggingfacehub_api_token=API_KEY
-)
+# Define the InferenceClient instance
+client = InferenceClient(model="mistralai/Mistral-7B-Instruct-v0.3", token=API_KEY)
 
 def extract_json(text) -> dict:
     """
@@ -81,7 +74,9 @@ Ensure the output is only valid JSON.
     
     for attempt in range(max_retries):
         try:
-            generated_text = llm.invoke(prompt)  # Use invoke() instead of __call__()
+            response = client.chat_completion(messages=[{"role": "user", "content": prompt}])
+            generated_text = response["choices"][0]["message"]["content"]  # Extract response text
+            
             reminder_data = extract_json(generated_text)
 
             if not all(k in reminder_data for k in ["time", "task", "date"]):
