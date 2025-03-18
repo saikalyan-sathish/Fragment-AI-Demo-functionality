@@ -29,7 +29,7 @@ if st.button("Process"):
                 
                 # Call agenda_db functionality
                 try:
-                    agenda_db.save_reminder(result["parsed_data"])
+                    agendas_db.save_reminder(result["parsed_data"])
                     st.write("Reminder stored successfully through agenda_db")
                 except Exception as e:
                     st.error(f"Error storing reminder: {e}")

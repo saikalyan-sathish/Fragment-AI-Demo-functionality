@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEndpoint
-from agendas_db import save_reminder  # Import MongoDB function
+import agendas_db  # Import MongoDB function
 
 # Load environment variables from .env file
 load_dotenv()
@@ -86,15 +86,8 @@ Ensure the output is only valid JSON.
 
             if not all(k in reminder_data for k in ["time", "task", "date"]):
                 raise ValueError("Missing required fields in response JSON.")
-
-            # Store in MongoDB
-            success, inserted_id = save_reminder(reminder_data)
-            if success:
-                print(f"✅ Reminder stored in MongoDB with ID: {inserted_id}")
-            else:
-                print("❌ Failed to store reminder in MongoDB.")
-
-            return reminder_data
+            
+            break  # Exit loop once we get valid reminder data
 
         except Exception as e:
             print(f"Attempt {attempt + 1} failed: {e}")
@@ -103,6 +96,19 @@ Ensure the output is only valid JSON.
                 time.sleep(delay)
             else:
                 raise Exception("All retry attempts failed. Unable to get a response from the API.")
+    if reminder_data:
+        existing_reminder = agendas_db.reminders_collection.find_one(reminder_data)
+
+        if not existing_reminder:  # Only save if it doesn't already exist
+            success, inserted_id = agendas_db.save_reminder(reminder_data)
+            if success:
+                print(f"✅ Reminder stored in MongoDB with ID: {inserted_id}")
+            else:
+                print("❌ Failed to store reminder in MongoDB.")
+        else:
+            print("🔄 Reminder already exists in MongoDB. Skipping insertion.")
+
+    return reminder_data  # Return only one structured reminder
 
 # Example usage
 if __name__ == "__main__":
