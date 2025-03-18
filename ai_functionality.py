@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 from langchain_huggingface import HuggingFaceEndpoint
 import agendas_db  # Import MongoDB function
 from huggingface_hub import InferenceClient
-
 # Load environment variables from .env file
 load_dotenv()
 
