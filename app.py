@@ -1,21 +1,34 @@
 import streamlit as st
 from workflow import workflow_instance
-from voice_input import get_voice_input_html
+from voice_input import get_voice_input
 import agendas_db  # Import your agenda_db module
-import json
 
 st.title("Advanced Reminder Agent")
+# Initialize session state for user input if not set
+if "user_input" not in st.session_state:
+    st.session_state["user_input"] = ""
 
 # Handle transcribed text from query params
 if 'transcribed' in st.query_params:
     st.session_state['user_input'] = st.query_params['transcribed']
     st.query_params.clear()
 
-# Text input linked to session state
-user_input = st.text_input("Enter your reminder request:", key='user_input')
+# Button to record voice input **before** rendering text_input
+if st.button("Record Voice"):
+    with st.spinner("Listening..."):
+        try:
+            transcribed_text = get_voice_input()
+            if "Error" not in transcribed_text:
+                #  Use session_state.update() instead of direct assignment
+                st.session_state.update({"user_input": transcribed_text})
+                st.success("✅ Voice input recorded and transcribed!")
+            else:
+                st.error(transcribed_text)
+        except Exception as e:
+            st.error(f"❌ Error in voice input: {e}")
 
-# Add the voice input component
-st.components.v1.html(get_voice_input_html(), height=50)
+# 🔥 Render text_input after updating session state
+user_input = st.text_input("Enter your reminder request:", value=st.session_state["user_input"], key="user_input")
 
 if st.button("Process"):
     if user_input:
