@@ -9,6 +9,7 @@ class AgentState(TypedDict):
     raw_response: Optional[str] = None
     parsed_data: Optional[dict] = None
     error: Optional[str] = None
+    result: Optional[str] = None
     retries: int = 0
 
 class ReminderWorkflow:

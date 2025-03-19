@@ -8,8 +8,8 @@ try:
     reminder_db = client["reminder_database"]
     reminders_collection = reminder_db["reminders"]
 
-    # Ensure collection exists by creating an index
-    reminders_collection.create_index("time")
+    # Ensure collection exists by creating an index for uniqueness
+    reminders_collection.create_index([("time", 1), ("task", 1), ("date", 1)], unique=True)
     print("✅ MongoDB connection established")
 
 except ConnectionFailure as e:
@@ -36,7 +36,21 @@ def save_reminder(reminder_data):
         if not required_keys.issubset(reminder_data.keys()):
             raise ValueError("Missing required fields: 'time', 'task', or 'date'")
 
-        # Insert document
+        # Remove '_id' if present to prevent duplication errors
+        reminder_data.pop("_id", None)
+
+        # Check if the reminder already exists
+        existing_reminder = reminders_collection.find_one({
+            "time": reminder_data["time"],
+            "task": reminder_data["task"],
+            "date": reminder_data["date"]
+        })
+
+        if existing_reminder:
+            print(f"⚠️ Reminder already exists: {existing_reminder['_id']}")
+            return (False, str(existing_reminder['_id']))  # Return existing reminder ID
+
+        # Insert document if no duplicate is found
         insert_result = reminders_collection.insert_one(reminder_data)
         print(f"✅ Reminder stored in MongoDB with ID: {insert_result.inserted_id}")
         return (True, str(insert_result.inserted_id))
