@@ -4,6 +4,7 @@ from voice_input import get_voice_input
 import agendas_db  # Import your agenda_db module
 
 st.title("Advanced Reminder Agent")
+
 # Initialize session state for user input if not set
 if "user_input" not in st.session_state:
     st.session_state["user_input"] = ""
@@ -19,17 +20,18 @@ if st.button("Record Voice"):
         try:
             transcribed_text = get_voice_input()
             if "Error" not in transcribed_text:
-                #  Use session_state.update() instead of direct assignment
-                st.session_state.update({"user_input": transcribed_text})
+                # 🔥 Update session state without causing widget conflicts
+                st.session_state["user_input"] = transcribed_text
                 st.success("✅ Voice input recorded and transcribed!")
             else:
                 st.error(transcribed_text)
         except Exception as e:
             st.error(f"❌ Error in voice input: {e}")
 
-# 🔥 Render text_input after updating session state
-user_input = st.text_input("Enter your reminder request:", value=st.session_state["user_input"], key="user_input")
+# 🔥 Render text_input without `value` parameter (Fixes warning)
+user_input = st.text_input("Enter your reminder request:", key="user_input")
 
+# Process button
 if st.button("Process"):
     if user_input:
         with st.spinner("Processing your request..."):
@@ -50,4 +52,4 @@ if st.button("Process"):
             else:
                 st.error(f"❌ Error: {result.get('error', 'Unknown error')}")
     else:
-        st.warning("Please enter a reminder request")
+        st.warning("Please enter a reminder request.")

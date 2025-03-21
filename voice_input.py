@@ -23,7 +23,7 @@ CHANNELS = 1  # Mono audio
 RATE = 16000  # Sample rate in Hz
 CHUNK = 1024  # Buffer size
 
-def record_audio_pyaudio(duration=5):
+def record_audio_pyaudio(duration=7):
     """Record audio from the microphone using PyAudio and store it in memory."""
     p = pyaudio.PyAudio()
 
